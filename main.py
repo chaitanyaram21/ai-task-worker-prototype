@@ -4,19 +4,12 @@ import tools
 from agent import AutonomousAgent
 
 def main():
-    # 1. Environment Check
     if not os.environ.get("GEMINI_API_KEY"):
-        print("[NOTICE] GEMINI_API_KEY environment variable not found.")
-        api_key = input("Please paste your Gemini API Key here and press Enter: ").strip()
-        if not api_key:
-            print("[ERROR] API Key is required to run the agent.")
-            return
-        os.environ["GEMINI_API_KEY"] = api_key
+        print("[CONFIGURATION ERROR]\nGEMINI_API_KEY environment variable not found.\nPlease set it before running.")
+        sys.exit(1)
 
-    # 2. Setup SQLite Database Environment
     tools.init_db()
 
-    # 3. Register available tools
     available_tools = [
         tools.list_files,
         tools.read_file,
@@ -29,11 +22,11 @@ def main():
         tools.task_complete
     ]
 
-    # 4. Initialize Agent
-    worker = AutonomousAgent(tools_list=available_tools)
+    try:
+        worker = AutonomousAgent(tools_list=available_tools)
+    except Exception:
+        sys.exit(1)
     
-    # 5. Define Task 
-    # Use CLI arguments if provided, else fall back to the default task prompt
     if len(sys.argv) > 1:
         task_prompt = " ".join(sys.argv[1:])
     else:
@@ -43,7 +36,6 @@ def main():
             "and verify that it was recorded before completing the task."
         )
     
-    # 6. Run
     worker.run(task_prompt)
 
 if __name__ == "__main__":

@@ -1,10 +1,9 @@
 __pycache__/
 *.py[cod]
-.env
-.env.*
+.pytest_cache/
 .venv/
 venv/
+.env
+.env.*
 data/internal_system.db
-*.db
-invoice_acme.txt
 tests/*.db

@@ -1,131 +1,84 @@
-# Autonomous AI Task Worker Prototype
+# Autonomous AI Task Worker
 
-**Author:** Ambati Chaitanya Ram  
-**Roll No:** 24110035  
-**Institution:** Indian Institute of Technology Gandhinagar  
-
-## Project Overview
-This project solves the problem of manual business process execution by providing an Autonomous AI Worker. It takes a natural-language task (e.g., extracting invoice data and entering it into an internal system) and autonomously reasons, plans, and acts to complete it.
-
-The agent operates in a constrained, secure local sandbox using a SQLite database as a persistent internal system and restricted filesystem tools.
+## Overview
+This project is an Autonomous AI Task Worker that receives a natural-language task (e.g., discovering invoices, extracting data, entering it into an internal system) and executes it autonomously using the Gemini API.
 
 ## Architecture
-```
-User
- |
- v
-Autonomous Agent (gemini-3.8-flash)
- |
- v
-LLM Function Calling
- |
- +--> File Tools (list_files, read_file, write_file)
- |
- +--> Web Tool (Wikipedia Search)
- |
- +--> Calculator
- |
- +--> Internal SQLite System (submit_invoice, verify_invoice)
- |
- +--> Human Clarification (ask_user_for_clarification)
- |
- v
+```text
+User Task
+   ↓
+Gemini
+   ↓
+Tool Selection
+   ↓
+Tool Execution
+   ↓
 Observation
- |
- v
-Agent (Evaluates state, checks for failures/retries)
- |
- v
-Verification (Independent Database Query)
- |
- +--> Success --> Completion
- |
- +--> Failure --> Retry / Alternative
+   ↓
+Gemini
+   ↓
+Verification
+   ↓
+Task Completion
 ```
 
-## Demo Workflow
-1. **Natural Language Task**: "Find the latest invoice from Acme Corp..."
-2. **File Discovery**: Agent uses `list_files("data/invoices")` to find candidate files.
-3. **Reading**: Agent reads the files to extract the invoice number, date, amount, and due date.
-4. **Submission**: Agent calls `submit_invoice_to_system` which persists the record in the local SQLite database.
-5. **Verification**: Agent is strictly required to call `verify_invoice_in_system` to independently query the database and confirm the record was saved correctly.
-6. **Completion**: Agent reports evidence of completion.
-
-## Setup Instructions
-
-1. Install Python 3.10 or higher.
-2. Initialize and activate a virtual environment (optional but recommended):
-   ```bash
+## Setup
+1. Create a virtual environment and activate it:
+   ```powershell
    python -m venv .venv
-   
-   # On Windows:
    .venv\Scripts\activate
-   # On Mac/Linux:
-   source .venv/bin/activate
    ```
-3. Install the required dependencies: 
-   ```bash
+2. Install dependencies:
+   ```powershell
    pip install -r requirements.txt
    ```
-4. Get a free Gemini API key from Google AI Studio.
-5. Set your API key as an environment variable in your terminal:
-   - **Command Prompt (Windows):** `set GEMINI_API_KEY=your_key_here`
-   - **PowerShell (Windows):** `$env:GEMINI_API_KEY="your_key_here"`
-   - **Mac/Linux:** `export GEMINI_API_KEY="your_key_here"`
+3. Set your API key:
+   ```powershell
+   $env:GEMINI_API_KEY="your_api_key_here"
+   ```
+   *(Optional) You can change the model via `$env:GEMINI_MODEL="gemini-1.5-pro"` (default is `gemini-3.8-flash`).*
 
-## Run
-To run the default invoice processing workflow:
-```bash
-python main.py
+## Running
+Run the default invoice task:
+```powershell
+python main.py "Find the latest invoice from Acme Corp in the data/invoices directory, extract the invoice number, amount and due date, enter it into our internal system, and verify that it was recorded before completing the task."
 ```
 
-To run a custom task:
-```bash
-python main.py "Find the invoice from Globex Corp in data/invoices, extract the details, submit it, and verify it."
+## Reliability
+- **Bounded Gemini Retries**: Uses exponential backoff (2s, 4s, 8s) up to 3 times to cleanly handle `503` (high demand) and `429` (rate limit) errors.
+- **Honest Failures**: Does not print giant tracebacks on standard errors. If the model is completely unavailable after 3 attempts, it terminates cleanly.
+- **Configuration Errors**: 401, 403, and 404 errors (like invalid models) are caught and reported as `[CONFIGURATION ERROR]`.
+- **Maximum Agent Steps**: Hard limit of 20 steps prevents infinite looping.
+- **Tool Failure Recovery**: Failures during tool execution are caught and passed to the LLM as observations, enabling bounded alternative strategies.
+
+## Verification
+The prototype does not blindly trust completion.
+- `submit_invoice_to_system()` persists the invoice to a real, stateful SQLite database.
+- `verify_invoice_in_system()` independently queries the database to compare expected values.
+- **Programmatic Enforcement**: The agent loop internally prevents the LLM from completing the task if a state-changing operation occurred without a subsequent successful independent verification.
+
+## Safety
+- **File Sandbox**: `read_file` and `list_files` strictly enforce boundaries via `pathlib` resolve checks (restricted to `data/`).
+- **Write Restrictions**: `write_file` is completely restricted to `data/output/`.
+- **Duplicate Protection**: SQLite prevents inserting duplicate invoices.
+- **Human Clarification**: An `ask_user_for_clarification` tool exists to break ambiguities safely.
+
+## Testing
+To run the automated tests (verifying retries, DB persistence, boundaries):
+```powershell
+pytest -q
 ```
 
-## Tests
-The project includes a suite of unit tests for the tools, testing SQLite persistence, verification, and filesystem sandbox restrictions.
-Run tests via:
-```bash
-python -m unittest discover tests
-```
+## Limitations
+- **Local simulated internal system**: Uses SQLite instead of a full enterprise ERP.
+- **Fictional data**: Relies on `data/invoices` text files.
+- **API Dependency**: Fully dependent on Google Gemini's availability.
+- **No external credentials**: Does not connect to live corporate endpoints.
+- **Narrow domain**: Primarily focused on basic file processing and data entry.
 
-## Design Decisions
-- **Native Function Calling:** We use the native Gemini SDK function calling feature because it guarantees highly structured, reliable API interactions compared to regex parsing.
-- **Local SQLite DB:** Rather than mocking a "SUCCESS" response, the agent interacts with a real SQLite database (`data/internal_system.db`) to ensure persistent state change and allow for actual verification.
-- **Independent Verification:** The agent is strictly prohibited from claiming success based on the submission tool's output alone. It must perform a separate database query to verify the transaction.
-- **Bounded Retries:** The agent tracks consecutive failures. If a tool fails 3 times, the agent is forced to try an alternative approach or halt.
-- **Human Clarification:** We implemented an `ask_user_for_clarification` tool, giving the agent a safe escalation path if data is ambiguous or authorization is required.
+## Future Improvements
+- Browser interaction (e.g., Playwright)
+- Richer approval workflows
+- Additional verification mechanisms
 
-## Reliability and Generalization
-- **Errors as Observations:** Python exceptions do not crash the script; they are caught and fed back to the LLM so it can learn from its mistake.
-- **Generalization:** The agent is not hardcoded to a single script. Because it relies on a dynamic ReAct loop, it can accomplish entirely different tasks (like web searching or math) using the same engine.
-
-## Known Limitations
-- **No GUI / Browser Vision:** The current prototype relies on text parsing and constrained Wikipedia search rather than arbitrary Playwright browser automation or computer-vision.
-- **Local Sandboxing Only:** While the filesystem tools prevent directory traversal (`../`), it lacks production-grade microVM isolation.
-
-## Future Work
-- **Playwright Browser Automation:** Giving the agent a headless browser to log into real SaaS platforms and scrape/click dynamically.
-- **Multimodal File Reading:** Upgrading the `read_file` tool to pass images and PDFs directly into Gemini's multimodal context, bypassing text-only limitations.
-- **RAG Memory:** Implementing a Vector Database for long-term semantic memory across different execution sessions.
-
-## Requirement Coverage
-
-| Requirement | Implementation |
-|-------------|----------------|
-| Natural-language task | Agent accepts arbitrary task text via CLI |
-| Planning/action selection | Handled natively by LLM function calling loop |
-| Tool execution | File sandbox, SQLite DB, Calculator, Web tools |
-| Observation | Tool results safely returned as string observations |
-| Memory | Conversational state maintained during execution |
-| Failure detection | Exceptions caught and returned as observations |
-| Retry | Bounded retry logic (max 3 consecutive failures) |
-| Verification | Independent SQLite `SELECT` verification tool |
-| Human clarification | `ask_user_for_clarification` tool interrupts execution |
-| Completion evidence | Verified record data included in `task_complete` |
-| Generalization | Supports user-supplied tasks via command line |
-
-## License
-This project is open-source and available under the [MIT License](LICENSE).
+*(Note: Demo video is not included per constraints).*
