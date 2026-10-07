@@ -1,0 +1,6 @@
+Invoice Number: ACME-ERR
+Company: Acme Corp
+Invoice Date: 2026-10-06
+Amount: 
+Due Date: 2026-11-05
+(Corrupted file, amount missing)

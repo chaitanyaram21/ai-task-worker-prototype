@@ -4,51 +4,128 @@
 **Roll No:** 24110035  
 **Institution:** Indian Institute of Technology Gandhinagar  
 
-This is a prototype of an Autonomous AI Worker capable of taking a natural language instruction, reasoning about it, utilizing simulated tools (file system, web search, internal APIs), and verifying completion. 
+## Project Overview
+This project solves the problem of manual business process execution by providing an Autonomous AI Worker. It takes a natural-language task (e.g., extracting invoice data and entering it into an internal system) and autonomously reasons, plans, and acts to complete it.
 
-It is built in Python using the official `google-genai` SDK, taking advantage of native LLM function calling to achieve a stable Reason-and-Act (ReAct) loop.
+The agent operates in a constrained, secure local sandbox using a SQLite database as a persistent internal system and restricted filesystem tools.
 
-## Setup and Run Instructions
+## Architecture
+```
+User
+ |
+ v
+Autonomous Agent (gemini-3.8-flash)
+ |
+ v
+LLM Function Calling
+ |
+ +--> File Tools (list_files, read_file, write_file)
+ |
+ +--> Web Tool (Wikipedia Search)
+ |
+ +--> Calculator
+ |
+ +--> Internal SQLite System (submit_invoice, verify_invoice)
+ |
+ +--> Human Clarification (ask_user_for_clarification)
+ |
+ v
+Observation
+ |
+ v
+Agent (Evaluates state, checks for failures/retries)
+ |
+ v
+Verification (Independent Database Query)
+ |
+ +--> Success --> Completion
+ |
+ +--> Failure --> Retry / Alternative
+```
+
+## Demo Workflow
+1. **Natural Language Task**: "Find the latest invoice from Acme Corp..."
+2. **File Discovery**: Agent uses `list_files("data/invoices")` to find candidate files.
+3. **Reading**: Agent reads the files to extract the invoice number, date, amount, and due date.
+4. **Submission**: Agent calls `submit_invoice_to_system` which persists the record in the local SQLite database.
+5. **Verification**: Agent is strictly required to call `verify_invoice_in_system` to independently query the database and confirm the record was saved correctly.
+6. **Completion**: Agent reports evidence of completion.
+
+## Setup Instructions
+
 1. Install Python 3.10 or higher.
-2. Install the required dependencies: `pip install -r requirements.txt`
-3. Get a free Gemini API key from Google AI Studio.
-4. Set your API key as an environment variable in your terminal:
+2. Initialize and activate a virtual environment (optional but recommended):
+   ```bash
+   python -m venv .venv
+   
+   # On Windows:
+   .venv\Scripts\activate
+   # On Mac/Linux:
+   source .venv/bin/activate
+   ```
+3. Install the required dependencies: 
+   ```bash
+   pip install -r requirements.txt
+   ```
+4. Get a free Gemini API key from Google AI Studio.
+5. Set your API key as an environment variable in your terminal:
    - **Command Prompt (Windows):** `set GEMINI_API_KEY=your_key_here`
    - **PowerShell (Windows):** `$env:GEMINI_API_KEY="your_key_here"`
    - **Mac/Linux:** `export GEMINI_API_KEY="your_key_here"`
-5. Run the prototype: `python main.py`
 
-## Architecture
-The prototype relies on a **ReAct (Reason and Act) loop** driven by the `google-genai` SDK. 
-- **The Brain:** The `AutonomousAgent` wraps a persistent LLM chat session. 
-- **The Hands:** A suite of isolated Python functions (`tools.py`) are passed to the model via native function calling schemas. 
-- **The Loop:** When given a prompt, the model returns a `function_call` payload instead of text. The Python script intercepts this, executes the local code (e.g., reading a file or hitting an API mock), and injects the output back into the chat as an observation. The model evaluates the result and loops until it confidently triggers the `task_complete` tool.
+## Run
+To run the default invoice processing workflow:
+```bash
+python main.py
+```
 
-## Important Technical & Design Decisions
-1. **Native Function Calling over Regex Parsing:** Older agents required prompting the LLM to output specific JSON formats and parsing them manually. I used native function calling schemas. This drastically improves reliability, as the model is fine-tuned at the API level to strictly adhere to tool parameter signatures.
-2. **Deterministic Termination:** I implemented an explicit `task_complete` tool. This solves the classic agent problem of infinite loops. The agent has a clear, programmatic way to signal that it believes the objective is met, passing its final verification summary.
-3. **Error Catching as Feedback:** If a tool fails (e.g., trying to read a missing file), the system doesn't crash. Instead, the `try/except` block returns the error string to the LLM. The system prompt instructs the agent to read this error and attempt a retry or an alternative approach, ensuring high resilience.
-4. **Generalization:** Because the ReAct loop evaluates actions dynamically rather than executing a hardcoded script, the exact same agent engine can accomplish entirely different tasks just by changing the `task_prompt`.
+To run a custom task:
+```bash
+python main.py "Find the invoice from Globex Corp in data/invoices, extract the details, submit it, and verify it."
+```
+
+## Tests
+The project includes a suite of unit tests for the tools, testing SQLite persistence, verification, and filesystem sandbox restrictions.
+Run tests via:
+```bash
+python -m unittest discover tests
+```
+
+## Design Decisions
+- **Native Function Calling:** We use the native Gemini SDK function calling feature because it guarantees highly structured, reliable API interactions compared to regex parsing.
+- **Local SQLite DB:** Rather than mocking a "SUCCESS" response, the agent interacts with a real SQLite database (`data/internal_system.db`) to ensure persistent state change and allow for actual verification.
+- **Independent Verification:** The agent is strictly prohibited from claiming success based on the submission tool's output alone. It must perform a separate database query to verify the transaction.
+- **Bounded Retries:** The agent tracks consecutive failures. If a tool fails 3 times, the agent is forced to try an alternative approach or halt.
+- **Human Clarification:** We implemented an `ask_user_for_clarification` tool, giving the agent a safe escalation path if data is ambiguous or authorization is required.
+
+## Reliability and Generalization
+- **Errors as Observations:** Python exceptions do not crash the script; they are caught and fed back to the LLM so it can learn from its mistake.
+- **Generalization:** The agent is not hardcoded to a single script. Because it relies on a dynamic ReAct loop, it can accomplish entirely different tasks (like web searching or math) using the same engine.
 
 ## Known Limitations
-- **Context Window Exhaustion:** For a workflow requiring 50+ steps, the chat history will grow indefinitely. Eventually, it will exceed the token limit, requiring a context-summarization mechanism.
-- **Sandboxing:** The `calculate` tool uses Python's `ast` for safety, but in a production environment, tools interacting with files or code execution need to be heavily isolated using Docker or microVMs (like Firecracker).
-- **No Vision:** This specific prototype relies on text extraction. It cannot natively process PDF invoices or navigate visual UI elements without additional tools.
+- **No GUI / Browser Vision:** The current prototype relies on text parsing and constrained Wikipedia search rather than arbitrary Playwright browser automation or computer-vision.
+- **Local Sandboxing Only:** While the filesystem tools prevent directory traversal (`../`), it lacks production-grade microVM isolation.
 
-## What I Would Build Next
-If given more time, I would build:
-1. **Playwright/Browser Integration:** Moving beyond mock APIs, I would give the agent a headless browser tool to log into real SaaS platforms, navigate DOM trees, and scrape/click dynamically.
-2. **Multimodal File Reading:** Upgrading the `read_file` tool to pass images and PDFs directly into Gemini's multimodal context, bypassing the need for separate OCR pipelines.
-3. **Vector Database Memory:** Implementing a RAG database to give the agent long-term memory across entirely different sessions.
+## Future Work
+- **Playwright Browser Automation:** Giving the agent a headless browser to log into real SaaS platforms and scrape/click dynamically.
+- **Multimodal File Reading:** Upgrading the `read_file` tool to pass images and PDFs directly into Gemini's multimodal context, bypassing text-only limitations.
+- **RAG Memory:** Implementing a Vector Database for long-term semantic memory across different execution sessions.
 
-## Assumptions Made
-- I assumed a mock internal environment is acceptable to demonstrate the logical reasoning capabilities of the agent without requiring real-world, authenticated SaaS credentials.
-- I assumed the user wants the agent to run locally on their machine, hence the use of local filesystem tools.
+## Requirement Coverage
 
-## Details of Models and APIs Used
-- **Model:** `gemini-3.8-flash` (chosen for its exceptionally fast inference speed, which is crucial for multi-step agent loops, and its native support for complex function calling).
-- **SDK:** Official `google-genai` Python SDK.
-- **External Services:** A lightweight call to the Wikipedia API is used to simulate a live web search tool.
+| Requirement | Implementation |
+|-------------|----------------|
+| Natural-language task | Agent accepts arbitrary task text via CLI |
+| Planning/action selection | Handled natively by LLM function calling loop |
+| Tool execution | File sandbox, SQLite DB, Calculator, Web tools |
+| Observation | Tool results safely returned as string observations |
+| Memory | Conversational state maintained during execution |
+| Failure detection | Exceptions caught and returned as observations |
+| Retry | Bounded retry logic (max 3 consecutive failures) |
+| Verification | Independent SQLite `SELECT` verification tool |
+| Human clarification | `ask_user_for_clarification` tool interrupts execution |
+| Completion evidence | Verified record data included in `task_complete` |
+| Generalization | Supports user-supplied tasks via command line |
 
 ## License
 This project is open-source and available under the [MIT License](LICENSE).
