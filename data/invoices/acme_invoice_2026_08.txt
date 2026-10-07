@@ -1,5 +1,5 @@
 Invoice Number: ACME-2026-008
 Company: Acme Corp
-Invoice Date: 2026-08-10
-Amount: 1000.00
-Due Date: 2026-09-09
+Invoice Date: 2026-08-12
+Amount: 1200
+Due Date: 2026-09-11

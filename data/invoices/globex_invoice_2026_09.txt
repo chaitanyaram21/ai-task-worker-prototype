@@ -1,5 +1,0 @@
-Invoice Number: GLB-2026-09
-Company: Globex Corp
-Invoice Date: 2026-09-15
-Amount: 3000.00
-Due Date: 2026-10-15

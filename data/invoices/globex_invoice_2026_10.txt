@@ -1,0 +1,5 @@
+Invoice Number: GLOBEX-2026-010
+Company: Globex Corporation
+Invoice Date: 2026-10-06
+Amount: 2100
+Due Date: 2026-11-05

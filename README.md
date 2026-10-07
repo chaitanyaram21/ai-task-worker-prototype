@@ -5,7 +5,10 @@
 **Institution:** Indian Institute of Technology Gandhinagar  
 
 ## Overview
-This project is an Autonomous AI Task Worker that receives a natural-language task (e.g., discovering invoices, extracting data, entering it into an internal system) and executes it autonomously using the Gemini API.
+This project is an Autonomous AI Task Worker that receives a natural-language task and executes it autonomously using the Gemini API.
+
+## Problem Being Solved
+Manual business processes (like discovering, reading, and entering invoices into a database) are time-consuming. This project demonstrates an AI agent that can autonomously navigate a local filesystem, extract structured data from unstructured text, and interact with a simulated internal database to complete workflows without hardcoded scripts.
 
 ## Architecture
 ```text
@@ -25,6 +28,18 @@ Verification
    ↓
 Task Completion
 ```
+
+## Expected Workflow
+For the primary invoice task, the expected autonomous sequence is:
+`discover (list_files)` → `read (read_file)` → `extract (LLM)` → `submit (submit_invoice_to_system)` → `verify (verify_invoice_in_system)` → `complete (task_complete)`
+
+## Available Tools
+- `list_files`: Discover files in a directory.
+- `read_file` / `write_file`: Safely read and write files within the sandbox.
+- `submit_invoice_to_system`: Persists extracted invoice data to the SQLite database.
+- `verify_invoice_in_system`: Independently queries the SQLite database to verify all fields.
+- `ask_user_for_clarification`: Halts execution to ask a human when ambiguity exists.
+- `task_complete`: Finishes the workflow, providing a summary and evidence.
 
 ## Setup
 1. Create a virtual environment and activate it:
