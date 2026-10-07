@@ -6,8 +6,12 @@ from agent import AutonomousAgent
 def main():
     # 1. Environment Check
     if not os.environ.get("GEMINI_API_KEY"):
-        print("[ERROR] Please set the GEMINI_API_KEY environment variable.")
-        return
+        print("[NOTICE] GEMINI_API_KEY environment variable not found.")
+        api_key = input("Please paste your Gemini API Key here and press Enter: ").strip()
+        if not api_key:
+            print("[ERROR] API Key is required to run the agent.")
+            return
+        os.environ["GEMINI_API_KEY"] = api_key
 
     # 2. Setup SQLite Database Environment
     tools.init_db()
