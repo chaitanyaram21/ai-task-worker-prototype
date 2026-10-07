@@ -1,5 +1,9 @@
 # Autonomous AI Task Worker
 
+**Author:** Ambati Chaitanya Ram  
+**Roll No:** 24110035  
+**Institution:** Indian Institute of Technology Gandhinagar  
+
 ## Overview
 This project is an Autonomous AI Task Worker that receives a natural-language task (e.g., discovering invoices, extracting data, entering it into an internal system) and executes it autonomously using the Gemini API.
 
@@ -81,4 +85,5 @@ pytest -q
 - Richer approval workflows
 - Additional verification mechanisms
 
-*(Note: Demo video is not included per constraints).*
+## License
+This project is open-source and available under the [MIT License](LICENSE).
