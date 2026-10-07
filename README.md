@@ -1,5 +1,9 @@
 # Autonomous AI Task Worker Prototype
 
+**Author:** Ambati Chaitanya Ram  
+**Roll No:** 24110035  
+**Institution:** Indian Institute of Technology Gandhinagar  
+
 This is a prototype of an Autonomous AI Worker capable of taking a natural language instruction, reasoning about it, utilizing simulated tools (file system, web search, internal APIs), and verifying completion. 
 
 It is built in Python using the official `google-genai` SDK, taking advantage of native LLM function calling to achieve a stable Reason-and-Act (ReAct) loop.
@@ -45,3 +49,6 @@ If given more time, I would build:
 - **Model:** `gemini-3.8-flash` (chosen for its exceptionally fast inference speed, which is crucial for multi-step agent loops, and its native support for complex function calling).
 - **SDK:** Official `google-genai` Python SDK.
 - **External Services:** A lightweight call to the Wikipedia API is used to simulate a live web search tool.
+
+## License
+This project is open-source and available under the [MIT License](LICENSE).
